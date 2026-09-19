@@ -1,0 +1,6 @@
+.claude/
+.cache/
+deps/
+models/
+build/
+*env

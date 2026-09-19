@@ -1,0 +1,19 @@
+# Headers under deps/ are not in compile_commands.json, so clangd infers their
+# flags from the nearest DB entry - which for deps/torch is sqlite3.c (a C file
+# with only the sqlite include dir). That makes every torch header parse as C
+# with no includes resolved, so goto-definition finds nothing.
+If:
+  PathMatch: .*deps/torch/.*
+CompileFlags:
+  Compiler: clang++
+  Remove:
+    - -Dsqlite3_EXPORTS
+    - -x
+    - c-header
+  Add:
+    - -xc++-header
+    - -std=c++17
+    - -DUSE_XPU
+    - -I/home/gaddi/Development/projects/embedding-explorer/deps/torch/include
+    - -I/home/gaddi/Development/projects/embedding-explorer/deps/torch/include/torch/csrc/api/include
+    - -I/home/gaddi/Development/projects/embedding-explorer/deps/oneapi/include
