@@ -1,11 +1,9 @@
 ![Embedding Explorer Graph](docs/embedding-explorer.png)
 # Embedding Explorer
 
-Implementation of Hugging Face's AutoModel to load open models and create vector databases of popular online repositories and visualize them in 3D w/ PCA.
+Implementation of Hugging Face's AutoModel to load open embedding models and create vector databases of popular online repositories and visualize them in 3D w/ PCA.
 
-Currently, "scripts/setup.sh", pulls in gemma3 (300M) as the encoder model of choice.
-
-Implemented at: gaddielwb.com/projects/embedding-explorer
+Currently the implementation @ gaddielwb.com/projects/embedding-explorer[gaddielwb.com/projects/embedding-explorer] pulls in and runs EmbeddingGemma3 (300M) as the encoder-transformer model of choice.
 
 ## Set up (Mac/Linux)
 
