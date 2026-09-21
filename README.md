@@ -3,7 +3,7 @@
 
 Implementation of Hugging Face's AutoModel to load open embedding models and create vector databases of popular online repositories and visualize them in 3D w/ PCA.
 
-Currently the implementation @ gaddielwb.com/projects/embedding-explorer[gaddielwb.com/projects/embedding-explorer] pulls in and runs EmbeddingGemma3 (300M) as the encoder-transformer model of choice.
+Currently the implementation at [gaddielwb.com/projects/embedding-explorer](https://gaddielwb.com/projects/embedding-explorer) pulls in and runs EmbeddingGemma3 (300M) as the encoder-transformer model of choice.
 
 ## Set up (Mac/Linux)
 
