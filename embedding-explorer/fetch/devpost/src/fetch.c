@@ -253,7 +253,7 @@ int fetch_hackathon_projects(const char *id, const char *name, int year) {
 /*
  * Fetch one project's write-up, given the slug the gallery handed back
  */
-int fetch_project_description(const char *slug, char **content, char **prizes) {
+int fetch_project_page(const char *slug, char **content, char **prizes) {
   // Initialize variables
   Response resp;
   int result = 0;
@@ -270,7 +270,7 @@ int fetch_project_description(const char *slug, char **content, char **prizes) {
   // write-up.
   if (status < 200 || status >= 300) {
     fprintf(stderr,
-            "fetch/devpost/src/fetch.c (fetch_project_description): %s "
+            "fetch/devpost/src/fetch.c (fetch_project_page): %s "
             "returned HTTP %ld\n",
             slug, status);
     dp_types_free_response(&resp);
@@ -290,6 +290,13 @@ int fetch_project_description(const char *slug, char **content, char **prizes) {
   dp_types_free_response(&resp);
 
   return result;
+}
+
+/*
+ * Fetch one project's write-up, given the slug the gallery handed back
+ */
+int fetch_project_description(const char *slug, char **content) {
+  return fetch_project_page(slug, content, NULL);
 }
 
 /*

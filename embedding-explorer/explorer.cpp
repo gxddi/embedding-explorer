@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <sstream>
 #include <thread>
 #include <vector>
 
@@ -159,12 +160,26 @@ void sync_vectors(sqlite3 *db, const Hackathon *hackathon,
 
   auto update = prepare(db, "UPDATE " + std::string(table) +
                                 " SET vector = ?1 WHERE id = ?2;");
+  // The project page the write-up comes from also lists the prizes it won
+  decltype(update) prizes(nullptr, update.get_deleter());
+  if (hackathon && table_has_column(db, "projects", "prizes"))
+    prizes = prepare(db, "UPDATE projects SET prizes = ?1 WHERE id = ?2 AND "
+                         "winner = 1;");
   int written = 0;
   for (const auto &[id, key] : pending) {
     char *content = nullptr;
-    int result = hackathon ? fetch_project_description(key.c_str(), &content)
+    char *won = nullptr;
+    int result = hackathon ? fetch_project_page(
+                                 key.c_str(), &content, prizes ? &won : nullptr)
                            : fetch_readme(key.c_str(), &content);
     std::unique_ptr<char, decltype(&std::free)> text(content, std::free);
+    std::unique_ptr<char, decltype(&std::free)> won_text(won, std::free);
+    if (prizes && won) {
+      sqlite3_bind_text(prizes.get(), 1, won, -1, SQLITE_TRANSIENT);
+      sqlite3_bind_int64(prizes.get(), 2, id);
+      step(prizes.get());
+      sqlite3_reset(prizes.get());
+    }
     if (result || !content || !*content)
       continue;
     torch::Tensor vector = embed(content, tokenizer, model, mutex);
@@ -176,6 +191,38 @@ void sync_vectors(sqlite3 *db, const Hackathon *hackathon,
     if (++written % 100 == 0)
       ++generation;
   }
+}
+
+// Prizes normally arrive with the write-up in sync_vectors. This catches the
+// winners announced after their project was already embedded.
+void sync_prizes(sqlite3 *db, const Hackathon &hackathon,
+                 std::atomic<uint64_t> &generation) {
+  if (!table_has_column(db, "projects", "prizes"))
+    return;
+  auto select = prepare(db, "SELECT id, slug FROM projects WHERE hackathon = "
+                            "?1 AND winner = 1 AND prizes IS NULL;");
+  sqlite3_bind_text(select.get(), 1, hackathon.id, -1, SQLITE_STATIC);
+  std::vector<std::pair<sqlite3_int64, std::string>> pending;
+  while (step(select.get()) == SQLITE_ROW)
+    pending.emplace_back(sqlite3_column_int64(select.get(), 0),
+                         reinterpret_cast<const char *>(
+                             sqlite3_column_text(select.get(), 1)));
+  select.reset();
+
+  auto update = prepare(db, "UPDATE projects SET prizes = ?1 WHERE id = ?2;");
+  for (const auto &[id, slug] : pending) {
+    char *content = nullptr;
+    int result = fetch_project_prizes(slug.c_str(), &content);
+    std::unique_ptr<char, decltype(&std::free)> prizes(content, std::free);
+    if (result || !content)
+      continue;
+    sqlite3_bind_text(update.get(), 1, content, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(update.get(), 2, id);
+    step(update.get());
+    sqlite3_reset(update.get());
+  }
+  if (!pending.empty())
+    ++generation;
 }
 
 // Years a hackathon has embedded projects for, newest first
@@ -236,6 +283,18 @@ std::shared_ptr<const View> build_view(sqlite3 *db, const Selection &selection,
           const float *blob = static_cast<const float *>(
               sqlite3_column_blob(select.get(), col));
           data.insert(data.end(), blob, blob + 768);
+        } else if (name == "winner") {
+          point[name] = sqlite3_column_int(select.get(), col) != 0;
+        } else if (name == "prizes") {
+          json prizes = json::array();
+          if (sqlite3_column_type(select.get(), col) == SQLITE_TEXT) {
+            std::istringstream lines(reinterpret_cast<const char *>(
+                sqlite3_column_text(select.get(), col)));
+            for (std::string line; std::getline(lines, line);)
+              if (!line.empty())
+                prizes.push_back(line);
+          }
+          point[name] = std::move(prizes);
         } else if (sqlite3_column_type(select.get(), col) == SQLITE_NULL) {
           point[name] = nullptr;
         } else if (sqlite3_column_type(select.get(), col) == SQLITE_INTEGER) {
@@ -436,6 +495,7 @@ int main() {
               std::cerr << hackathon.id << ": some galleries failed\n";
             sync_vectors(writer.get(), &hackathon, tokenizer, model, mutex,
                          generation);
+            sync_prizes(writer.get(), hackathon, generation);
             ++generation;
             view_of(writer.get(), {hackathon.id, &hackathon});
           } catch (const std::exception &error) {
