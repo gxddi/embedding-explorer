@@ -98,8 +98,8 @@ int dp_flush_response_hosts(Response *resp, Hosts **hosts, long *total,
     return 1;
   }
 
-  // Only the subdomain is kept. Nothing else about the event is worth holding
-  // on to here: the gallery behind it is the point.
+  // The subdomain is where the gallery is, the title and year are what a
+  // caller looking for one hackathon picks it out by.
   cJSON *item = NULL;
   cJSON_ArrayForEach(item, items) {
     cJSON *url = cJSON_GetObjectItem(item, "url");
@@ -111,8 +111,18 @@ int dp_flush_response_hosts(Response *resp, Hosts **hosts, long *total,
       continue;
     }
 
+    // "Jan 17 - 18, 2026": the year is the last four digits of the dates
+    cJSON *title = cJSON_GetObjectItem(item, "title");
+    cJSON *dates = cJSON_GetObjectItem(item, "submission_period_dates");
+    int year = 0;
+    if (cJSON_IsString(dates) && strlen(dates->valuestring) >= 4) {
+      year = atoi(dates->valuestring + strlen(dates->valuestring) - 4);
+    }
+
     *cur = (Hosts *)malloc(sizeof(Hosts));
     (*cur)->name = host;
+    (*cur)->title = strdup(cJSON_IsString(title) ? title->valuestring : "");
+    (*cur)->year = year;
     (*cur)->next = NULL;
     cur = &(*cur)->next;
   }
@@ -156,6 +166,8 @@ int dp_flush_gallery_projects(Response *resp, Projects **projects, int *found) {
     (*cur)->tagline =
         dp_parse_between(card, stop, "class=\"small tagline\">", "</p>", NULL);
     (*cur)->likes = dp_parse_number(card, stop, DP_LIKES, "</span>");
+    (*cur)->hackathon = NULL;
+    (*cur)->year = 0;
 
     // Both arrive wrapped in the markup that lays them out
     if ((*cur)->name != NULL) {

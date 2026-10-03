@@ -6,6 +6,7 @@ void dp_types_free_hosts(Hosts *head) {
   while (head != NULL) {
     Hosts *next = head->next;
     free(head->name);
+    free(head->title);
     free(head);
     head = next;
   }

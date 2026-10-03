@@ -20,6 +20,15 @@ extern "C" {
 int fetch_projects(int max_hackathons);
 
 /*
+ * Fetch the projects submitted to one hackathon and sync them into the
+ * database, each tagged with id and the year it was submitted in.
+ *
+ *  - name is the title every edition of it starts with, e.g. "TreeHacks"
+ *  - year at or below 0 walks every year of it
+ */
+int fetch_hackathon_projects(const char *id, const char *name, int year);
+
+/*
  * Fetch one project's write-up, given the slug the gallery handed back. The
  * page it lives on is assembled from the slug, the same way a repo's readme
  * url is assembled from its name.

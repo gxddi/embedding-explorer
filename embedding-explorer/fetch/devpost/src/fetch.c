@@ -1,5 +1,8 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 #include <unistd.h>
 
 #include "call.h"
@@ -14,6 +17,7 @@
 // /software/built-with, sit behind a WAF that answers an unattended request
 // with 202 and an empty body.
 #define DP_LISTING "https://devpost.com/api/hackathons?page=%d&per_page=%d"
+#define DP_SEARCH DP_LISTING "&search=%s"
 #define DP_GALLERY "https://%s.devpost.com/project-gallery?page=%d"
 #define DP_PROJECT "https://devpost.com/software/%s"
 
@@ -36,8 +40,10 @@
  * NOTE: The gallery is the unit of work, the way a star window is on the
  * github side: it is collected whole and written in one go. An event that has
  * not been submitted to yet serves an empty gallery, which syncs nothing.
+ *
+ *  - hackathon and year tag every project synced, NULL and 0 leave them unset
  */
-static int gallery(const char *host) {
+static int gallery(const char *host, const char *hackathon, int year) {
 
   Projects *head = NULL; // Head to linked list of projects
   char link[256];        // links
@@ -84,6 +90,11 @@ static int gallery(const char *host) {
     if (found == 0) {
       break;
     }
+  }
+
+  for (Projects *cur = head; cur != NULL; cur = cur->next) {
+    cur->hackathon = hackathon;
+    cur->year = year;
   }
 
   if (head != NULL) {
@@ -148,7 +159,7 @@ int fetch_projects(int max_hackathons) {
       if (max_hackathons >= 0 && done >= max_hackathons) {
         break;
       }
-      result |= gallery(cur->name);
+      result |= gallery(cur->name, NULL, 0);
       done++;
     }
     dp_types_free_hosts(hosts);
@@ -161,6 +172,81 @@ int fetch_projects(int max_hackathons) {
   }
 
   printf("Walked %d hackathon gallery(s).\n", done);
+  return result;
+}
+
+/*
+ * Whether a listing title belongs to the named hackathon: it starts with the
+ * name, case aside. A search for "TreeHacks" also answers "Hortonworks @
+ * TreeHacks", which is a different event.
+ */
+static int titled(const char *title, const char *name) {
+  return strncasecmp(title, name, strlen(name)) == 0;
+}
+
+/*
+ * Fetch the projects submitted to one hackathon, every year of it or one, and
+ * sync them into the database tagged with id and the year.
+ *
+ * NOTE: The listing's search narrows thousands of events to a few pages, so
+ * this walks the galleries of only the events titled name rather than the
+ * whole listing.
+ */
+int fetch_hackathon_projects(const char *id, const char *name, int year) {
+
+  char link[512];    // links
+  char search[128];  // name with its spaces as the query string wants them
+  Response resp;     // response body buffer
+  long status = 0;   // HTTP status of the last request
+  long total = 0;    // size of the whole search, not of this page
+  long per_page = 0; // page size the listing actually served
+
+  int done = 0;   // galleries walked so far
+  int result = 0; // final result
+
+  size_t n = 0;
+  for (const char *c = name; *c != '\0' && n + 1 < sizeof(search); c++) {
+    search[n++] = *c == ' ' ? '+' : (char)tolower((unsigned char)*c);
+  }
+  search[n] = '\0';
+
+  for (int page = 1;; page++) {
+
+    Hosts *hosts = NULL;
+
+    snprintf(link, sizeof(link), DP_SEARCH, page, DP_PER_PAGE, search);
+    if (dp_call_url(link, &resp, &status)) {
+      return 1;
+    }
+    if (status < 200 || status >= 300) {
+      fprintf(stderr,
+              "fetch/devpost/src/fetch.c (fetch_hackathon_projects): %s page "
+              "%d returned HTTP %ld\n",
+              name, page, status);
+      dp_types_free_response(&resp);
+      return 1;
+    }
+    if (dp_flush_response_hosts(&resp, &hosts, &total, &per_page)) {
+      dp_types_free_response(&resp);
+      return 1;
+    }
+    dp_types_free_response(&resp);
+
+    for (Hosts *cur = hosts; cur != NULL; cur = cur->next) {
+      if (!titled(cur->title, name) || (year > 0 && cur->year != year)) {
+        continue;
+      }
+      result |= gallery(cur->name, id, cur->year);
+      done++;
+    }
+    dp_types_free_hosts(hosts);
+
+    if (per_page <= 0 || (long)page * per_page >= total) {
+      break;
+    }
+  }
+
+  printf("Walked %d %s gallery(s).\n", done, name);
   return result;
 }
 

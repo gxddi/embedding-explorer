@@ -18,6 +18,8 @@ typedef struct Response {
 // Hackathon subdomains, the galleries left to walk
 typedef struct Hosts {
   char *name; // subdomain only, the rest of the url is assembled
+  char *title; // display title, what a hackathon is picked out by
+  int year;    // year its submissions closed, 0 when the listing has none
   struct Hosts *next;
 } Hosts;
 
@@ -34,6 +36,8 @@ typedef struct Projects {
   char *name;   // display title
   char *tagline;
   long likes;
+  const char *hackathon; // id the caller walked it under, not owned
+  int year;              // year of the hackathon it was submitted to
   Members *members;
   struct Projects *next;
 } Projects;
