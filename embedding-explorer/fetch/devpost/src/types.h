@@ -38,6 +38,7 @@ typedef struct Projects {
   long likes;
   const char *hackathon; // id the caller walked it under, not owned
   int year;              // year of the hackathon it was submitted to
+  int winner;            // 1 when its gallery card carries the winner badge
   Members *members;
   struct Projects *next;
 } Projects;

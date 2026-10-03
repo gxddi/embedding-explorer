@@ -67,7 +67,9 @@ int dp_sync_projects(Projects *projects) {
                        "  members TEXT," // space separated, sqlite has no list
                        "  vector BLOB,"
                        "  hackathon TEXT,"
-                       "  year INTEGER"
+                       "  year INTEGER,"
+                       "  winner INTEGER,"
+                       "  prizes TEXT" // one per line, NULL until fetched
                        ");";
 
   char *err = NULL;
@@ -84,6 +86,10 @@ int dp_sync_projects(Projects *projects) {
                NULL, NULL);
   sqlite3_exec(handle, "ALTER TABLE projects ADD COLUMN year INTEGER;", NULL,
                NULL, NULL);
+  sqlite3_exec(handle, "ALTER TABLE projects ADD COLUMN winner INTEGER;", NULL,
+               NULL, NULL);
+  sqlite3_exec(handle, "ALTER TABLE projects ADD COLUMN prizes TEXT;", NULL,
+               NULL, NULL);
 
   // Update the row for this id, creating it if the id is new, and skip the
   // write entirely when nothing about the project has changed.
@@ -95,15 +101,16 @@ int dp_sync_projects(Projects *projects) {
   sqlite3_stmt *stmt;
   const char *upsert =
       "INSERT INTO projects (id, slug, name, tagline, likes, members, "
-      "hackathon, year) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) "
+      "hackathon, year, winner) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) "
       "ON CONFLICT(id) DO UPDATE SET slug = excluded.slug, "
       "name = excluded.name, tagline = excluded.tagline, "
       "likes = excluded.likes, members = excluded.members, "
       "hackathon = COALESCE(excluded.hackathon, hackathon), "
-      "year = COALESCE(excluded.year, year) "
+      "year = COALESCE(excluded.year, year), winner = excluded.winner, "
+      "prizes = CASE WHEN excluded.winner THEN prizes END "
       "WHERE slug IS NOT excluded.slug OR name IS NOT excluded.name "
       "OR tagline IS NOT excluded.tagline OR likes IS NOT excluded.likes "
-      "OR members IS NOT excluded.members "
+      "OR members IS NOT excluded.members OR winner IS NOT excluded.winner "
       "OR excluded.hackathon IS NOT NULL AND hackathon IS NOT excluded.hackathon "
       "OR excluded.year IS NOT NULL AND year IS NOT excluded.year;";
 
@@ -128,6 +135,7 @@ int dp_sync_projects(Projects *projects) {
     if (cur->year > 0) {
       sqlite3_bind_int(stmt, 8, cur->year);
     }
+    sqlite3_bind_int(stmt, 9, cur->winner);
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
       fprintf(stderr, "upsert failed: %s\n", sqlite3_errmsg(handle));

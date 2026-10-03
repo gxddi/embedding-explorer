@@ -12,12 +12,30 @@
 #define DP_SLUG "href=\"https://devpost.com/software/"
 #define DP_MEMBER "data-url=\"https://devpost.com/"
 #define DP_LIKES "data-count=\"like\">"
+#define DP_WINNER_BADGE "class=\"winner\""
+
+// Each prize won, as the project page's "Submitted to" column lists it
+#define DP_SUBMISSIONS "id=\"submissions\""
+#define DP_PRIZE "class=\"winner label"
 
 // The write-up on a project page, which runs from the top of the left column
 // down to the tag list under it
 #define DP_DETAILS "id=\"app-details-left\">"
 #define DP_BUILT_WITH "id=\"built-with\""
 #define DP_DETAILS_END "id=\"app-details-right\""
+
+/*
+ * Whether needle occurs inside [from, limit)
+ */
+static int contains(const char *from, const char *limit, const char *needle) {
+  size_t n = strlen(needle);
+  for (const char *at = from; at + n <= limit; at++) {
+    if (memcmp(at, needle, n) == 0) {
+      return 1;
+    }
+  }
+  return 0;
+}
 
 /*
  * Reset resp to an empty buffer, so the next page writes into a fresh one.
@@ -168,6 +186,7 @@ int dp_flush_gallery_projects(Response *resp, Projects **projects, int *found) {
     (*cur)->likes = dp_parse_number(card, stop, DP_LIKES, "</span>");
     (*cur)->hackathon = NULL;
     (*cur)->year = 0;
+    (*cur)->winner = contains(card, stop, DP_WINNER_BADGE);
 
     // Both arrive wrapped in the markup that lays them out
     if ((*cur)->name != NULL) {
@@ -232,5 +251,53 @@ int dp_flush_response_description(Response *resp, char **cont) {
   dp_parse_text(*cont);
 
   reset(resp);
+  return 0;
+}
+
+/*
+ * Load the prizes won out of resp into prizes, leaving resp as it is
+ */
+int dp_flush_response_prizes(Response *resp, char **prizes) {
+  const char *end = resp->data + resp->size;
+  const char *at = strstr(resp->data, DP_SUBMISSIONS);
+
+  size_t size = 0;
+  *prizes = (char *)calloc(1, 1);
+  if (*prizes == NULL) {
+    return 1;
+  }
+
+  // Each badge is followed by the prize's name, up to the end of its item
+  while (at != NULL && (at = strstr(at, DP_PRIZE)) != NULL && at < end) {
+    char *name = dp_parse_between(at, end, "</span>", "</li>", &at);
+    if (name == NULL) {
+      break;
+    }
+    dp_parse_text(name);
+    char *first = name;
+    while (*first == ' ' || *first == '\n') {
+      first++;
+    }
+    size_t len = strlen(first);
+    while (len > 0 && (first[len - 1] == ' ' || first[len - 1] == '\n')) {
+      len--;
+    }
+    if (len > 0) {
+      char *grown = (char *)realloc(*prizes, size + len + 2);
+      if (grown == NULL) {
+        free(name);
+        return 1;
+      }
+      *prizes = grown;
+      if (size > 0) {
+        (*prizes)[size++] = '\n';
+      }
+      memcpy(*prizes + size, first, len);
+      size += len;
+      (*prizes)[size] = '\0';
+    }
+    free(name);
+  }
+
   return 0;
 }

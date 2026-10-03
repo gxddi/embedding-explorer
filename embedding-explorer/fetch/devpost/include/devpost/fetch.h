@@ -34,8 +34,17 @@ int fetch_hackathon_projects(const char *id, const char *name, int year);
  * url is assembled from its name.
  *
  *  - content receives a fresh buffer the caller frees
+ *  - prizes, when not NULL, receives the prizes it won off the same page, one
+ *    per line, in a fresh buffer the caller frees
  */
-int fetch_project_description(const char *slug, char **content);
+int fetch_project_description(const char *slug, char **content, char **prizes);
+
+/*
+ * Fetch the prizes one project won, one per line, given its slug.
+ *
+ *  - prizes receives a fresh buffer the caller frees, empty when it won none
+ */
+int fetch_project_prizes(const char *slug, char **prizes);
 #ifdef __cplusplus
 }
 #endif

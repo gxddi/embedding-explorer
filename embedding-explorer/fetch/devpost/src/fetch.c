@@ -253,7 +253,7 @@ int fetch_hackathon_projects(const char *id, const char *name, int year) {
 /*
  * Fetch one project's write-up, given the slug the gallery handed back
  */
-int fetch_project_description(const char *slug, char **content) {
+int fetch_project_description(const char *slug, char **content, char **prizes) {
   // Initialize variables
   Response resp;
   int result = 0;
@@ -277,11 +277,43 @@ int fetch_project_description(const char *slug, char **content) {
     return 1;
   }
 
+  // Prizes first, the description flush empties the page
+  if (prizes != NULL && dp_flush_response_prizes(&resp, prizes)) {
+    dp_types_free_response(&resp);
+    return 1;
+  }
+
   // Flush the write-up out of the page into content
   result = dp_flush_response_description(&resp, content);
 
   /* Clean up */
   dp_types_free_response(&resp);
 
+  return result;
+}
+
+/*
+ * Fetch the prizes one project won, given the slug the gallery handed back
+ */
+int fetch_project_prizes(const char *slug, char **prizes) {
+  Response resp;
+  char link[256];
+  long status = 0;
+
+  snprintf(link, sizeof(link), DP_PROJECT, slug);
+  if (dp_call_url(link, &resp, &status)) {
+    return 1;
+  }
+  if (status < 200 || status >= 300) {
+    fprintf(stderr,
+            "fetch/devpost/src/fetch.c (fetch_project_prizes): %s returned "
+            "HTTP %ld\n",
+            slug, status);
+    dp_types_free_response(&resp);
+    return 1;
+  }
+
+  int result = dp_flush_response_prizes(&resp, prizes);
+  dp_types_free_response(&resp);
   return result;
 }

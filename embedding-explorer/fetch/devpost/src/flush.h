@@ -35,4 +35,13 @@ int dp_flush_gallery_projects(Response *resp, Projects **projects, int *found);
  */
 int dp_flush_response_description(Response *resp, char **cont);
 
+/*
+ * Load the prizes a project page lists as won into prizes, one per line. A
+ * page that lists none gives an empty string.
+ *
+ * NOTE: Unlike the rest, this leaves resp as it is, so the description can be
+ * read out of the same page afterwards.
+ */
+int dp_flush_response_prizes(Response *resp, char **prizes);
+
 #endif
