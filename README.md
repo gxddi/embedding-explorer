@@ -39,7 +39,7 @@ Requirements:
 TBA
 
 ## Motivations
-Originally created to index GitHub and DevPost to find projects similar to the ones I was working on but realized that this is pretty much just Exa. 
+Originally created to index GitHub and DevPost to find projects similar to the ones I was working on but realized that this is pretty much just [Exa](https://exa.ai/). 
 
 ## Contributions
 
