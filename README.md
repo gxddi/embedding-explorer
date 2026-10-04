@@ -44,7 +44,8 @@ Originally created to index GitHub and DevPost to find projects similar to the o
 ## Contributions
 
 ### AI Contributions
-- Heavy contributions to the devpost version of the fetch program
+- Heavy contributions to the devpost implementation of fetch/
+- Heavy contributions to the actual server, adapted from some of my [boilerplate](https://github.com/gxddi/boilerplate/tree/main/website-stack)
 
 ---
 
